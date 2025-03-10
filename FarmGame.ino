@@ -1,16 +1,30 @@
-//Jonathan Holmes (crait)
-//October 24th, 2016
-//Number Guessing Game
-
 #include <Arduboy2.h>
 #include "FarmGameSprites.h"
 Arduboy2 arduboy;
 
 #define GAMEFPS 30
+#define buffer_size 10
 
 int playerX;
 int playerY;
 enum Direction {south, west, north, east};
+
+struct Animations {
+  Animations(); // Empty contructor for global creation
+
+  bool addQueue(uint8_t* animation, uint8_t* mask, uint8_t start, uint16_t end, uint8_t FPS, bool loop) {
+
+  }
+  
+  uint8_t qTracker = 0;
+
+  uint8_t* animation[buffer_size];
+  uint8_t* mask[buffer_size];
+  uint8_t start[buffer_size];
+  uint16_t end[buffer_size];
+  uint8_t FPS[buffer_size];
+  bool loop[buffer_size];
+}
 
 void setup() {
   arduboy.begin();
@@ -73,7 +87,7 @@ void controlPlayer() {
 void animationSelector(uint8_t state) {
   switch(state) {
     case 0:
-      animationPlayer(FarmerWalk, FarmerWalkMask, 0, 1, 15, false);
+      // animationPlayer(FarmerWalk, FarmerWalkMask, 0, 1, 15, false);
       break;
     case 1:
       Sprites::drawExternalMask(playerX, playerY, FarmerWalk, FarmerWalkMask, 2, 0);
@@ -92,25 +106,11 @@ void animationSelector(uint8_t state) {
 /* animationPlayer
   This function will house the logic needed to play through an animation either on loop or once.
   */
-void animationPlayer(uint8_t* animation, uint8_t* mask, uint8_t start, uint16_t end, uint8_t FPS, bool loop) {
-  // First grab the height and width to calculate the number of frames
-  uint8_t w = animation[0]; uint8_t h = animation[1];
-  uint8_t frame = start;
-  uint8_t counter = 0; // This will track how many game frames have passed
+void animationPlayerCall(uint8_t* animation, uint8_t* mask, uint8_t start, uint16_t end, uint8_t FPS, bool loop) {
+  
 
-  if(FPS != GAMEFPS) {
-    if(counter > 0) {
-      counter++;
-      return;
-    }
-    if(counter > FPS) counter = 0;
-  } else {
-    counter = 0;
-  }
-  arduboy.print(counter);
+}
 
-  Sprites::drawExternalMask(playerX, playerY, animation, mask, frame, 0);
-  frame++;
-  if(frame > end) frame = start;
-  counter++;
+void animationPlayer() {
+
 }
