@@ -3,45 +3,53 @@
 Arduboy2 arduboy;
 
 #define GAMEFPS 30
-#define buffer_size 10
 
-int playerX;
-int playerY;
-enum Direction {south, west, north, east};
+enum class Stance {
+  Idle,
+  Walk,
+  Plant,
+  Water
+};
 
-struct Animations {
-  Animations(); // Empty contructor for global creation
+enum WalkFrame {
+  South1, South2,
+  West1, West2,
+  North1, North2,
+  East1, East2,
+  None
+};
 
-  bool addQueue(uint8_t* animation, uint8_t* mask, uint8_t start, uint16_t end, uint8_t FPS, bool loop) {
+struct Farmer {
+  uint16_t x;
+  uint16_t y;
+  Stance stance;
+  uint8_t frame;
+  const uint8_t *image;
+  const uint8_t *mask;
+};
 
-  }
-  
-  uint8_t qTracker = 0;
+const uint8_t *farmerImages[] = {FarmerIdle, FarmerWalk};
+const uint8_t *farmerMasks[] = {FarmerIdleMask, FarmerWalkMask};
 
-  uint8_t* animation[buffer_size];
-  uint8_t* mask[buffer_size];
-  uint8_t start[buffer_size];
-  uint16_t end[buffer_size];
-  uint8_t FPS[buffer_size];
-  bool loop[buffer_size];
-}
+Farmer farmer = {WIDTH/2, HEIGHT/2, Stance::Idle, 0, FarmerIdle, FarmerIdleMask};
 
 void setup() {
   arduboy.begin();
-  arduboy.clear();
-  arduboy.initRandomSeed();
   arduboy.setFrameRate(GAMEFPS);
-  playerX = 10;
-  playerY = 25;
+  arduboy.initRandomSeed();
 }
 
 void loop() {
   if(!arduboy.nextFrame()) return; // Prevents game from running fast
   arduboy.clear();
   arduboy.pollButtons();
-  drawBackground();
+  
+  controlFarmer();
+  updateFarmer();
 
-  controlPlayer();
+  drawBackground();
+  drawFarmer();
+
   arduboy.display();
 }
 
@@ -61,56 +69,97 @@ void drawBackground() {
   }
 }
 
-void controlPlayer() {
+void controlFarmer() {
+  // This will be where all the controls will be set
+  if(arduboy.pressed(UP_BUTTON)) {
+    farmer.y -= 1;
+    farmer.stance = Stance::Walk;
+    if(farmer.frame != WalkFrame::North1 && farmer.frame != WalkFrame::North2) {
+      farmer.frame = WalkFrame::North1;
+    }
+    
+  }
+  if(arduboy.pressed(DOWN_BUTTON)) {
+    farmer.y += 1;
+    farmer.stance = Stance::Walk;
+    if(farmer.frame != WalkFrame::South1 && farmer.frame != WalkFrame::South2) {
+      farmer.frame = WalkFrame::South1;
+    }
+    
+  }
+  if(arduboy.pressed(LEFT_BUTTON)) {
+    farmer.x -= 1;
+    farmer.stance = Stance::Walk;
+    if(farmer.frame != WalkFrame::West1 && farmer.frame != WalkFrame::West2) {
+      farmer.frame = WalkFrame::West1;
+    }
+    
+  }
+  if(arduboy.pressed(RIGHT_BUTTON)) {
+    farmer.x += 1;
+    farmer.stance = Stance::Walk;
+    if(farmer.frame != WalkFrame::East1 && farmer.frame != WalkFrame::East2) {
+      farmer.frame = WalkFrame::East1;
+    }
+  }
   if(arduboy.notPressed(UP_BUTTON | DOWN_BUTTON | LEFT_BUTTON | RIGHT_BUTTON)) {
-    animationSelector(250); // FORCES Default CASE
-  } else {
-    if(arduboy.pressed(UP_BUTTON)) {
-      playerY -= 1;
-      animationSelector(Direction::north);
-    }
-    if(arduboy.pressed(DOWN_BUTTON)) {
-      playerY += 1;
-      animationSelector(Direction::south);
-    }
-    if(arduboy.pressed(LEFT_BUTTON)) {
-      playerX -= 1;
-      animationSelector(Direction::west);
-    }
-    if(arduboy.pressed(RIGHT_BUTTON)) {
-      playerX += 1;
-      animationSelector(Direction::east);
-    }
+    farmer.stance = Stance::Idle;
   }
 }
 
-void animationSelector(uint8_t state) {
-  switch(state) {
-    case 0:
-      // animationPlayer(FarmerWalk, FarmerWalkMask, 0, 1, 15, false);
+void updateFarmer() {
+  // This will be the animation changes and the like
+  switch(farmer.stance) {
+    case Stance::Idle:
       break;
-    case 1:
-      Sprites::drawExternalMask(playerX, playerY, FarmerWalk, FarmerWalkMask, 2, 0);
-      break;
-    case 2:
-      Sprites::drawExternalMask(playerX, playerY, FarmerWalk, FarmerWalkMask, 4, 0);
-      break;
-    case 3:
-      Sprites::drawExternalMask(playerX, playerY, FarmerWalk, FarmerWalkMask, 6, 0);
-      break;
-    default:
-      Sprites::drawExternalMask(playerX, playerY, Farmer, FarmerMask, 0, 0);
+
+    case Stance::Walk:
+      if(arduboy.everyXFrames(3)) {
+        switch(farmer.frame) {
+          case WalkFrame::South1:
+            farmer.frame = WalkFrame::South2;
+            break;
+          case WalkFrame::South2:
+            farmer.frame = WalkFrame::South1;
+            break;
+
+          case WalkFrame::West1:
+            farmer.frame = WalkFrame::West2;
+            break;
+          case WalkFrame::West2:
+            farmer.frame = WalkFrame::West1;
+            break;
+
+          case WalkFrame::North1:
+            farmer.frame = WalkFrame::North2;
+            break;
+          case WalkFrame::North2:
+            farmer.frame = WalkFrame::North1;
+            break;
+
+          case WalkFrame::East1:
+            farmer.frame = WalkFrame::East2;
+            break;
+          case WalkFrame::East2:
+            farmer.frame = WalkFrame::East1;
+            break;
+
+          default:
+            break;
+        }
+      }
   }
 }
 
-/* animationPlayer
-  This function will house the logic needed to play through an animation either on loop or once.
-  */
-void animationPlayerCall(uint8_t* animation, uint8_t* mask, uint8_t start, uint16_t end, uint8_t FPS, bool loop) {
-  
+void drawFarmer() {
+  uint8_t imageIndex = static_cast<uint8_t>(farmer.stance);
+  uint8_t maskFrame = 0;
+  if(farmer.stance == Stance::Idle) farmer.frame = 0;
+  if(farmer.stance == Stance::Walk) {
+    maskFrame = farmer.frame % 2;
+  }
 
-}
-
-void animationPlayer() {
-
+  farmer.image = farmerImages[imageIndex];
+  farmer.mask = farmerMasks[imageIndex];
+  Sprites::drawExternalMask(farmer.x, farmer.y, farmer.image, farmer.mask, farmer.frame, maskFrame);
 }
