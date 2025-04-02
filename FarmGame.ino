@@ -3,12 +3,17 @@
 Arduboy2 arduboy;
 
 #define GAMEFPS 30
+#define SELOFFSET 10
 
 enum class Stance {
   Idle,
   Walk,
   Plant,
   Water
+};
+
+enum class Direction {
+  South, West, North, East
 };
 
 enum WalkFrame {
@@ -23,7 +28,15 @@ struct Farmer {
   uint16_t x;
   uint16_t y;
   Stance stance;
+  Direction direction;
   uint8_t frame;
+  const uint8_t *image;
+  const uint8_t *mask;
+};
+
+struct Selector {
+  uint16_t x;
+  uint16_t y;
   const uint8_t *image;
   const uint8_t *mask;
 };
@@ -31,7 +44,12 @@ struct Farmer {
 const uint8_t *farmerImages[] = {FarmerIdle, FarmerWalk};
 const uint8_t *farmerMasks[] = {FarmerIdleMask, FarmerWalkMask};
 
-Farmer farmer = {WIDTH/2, HEIGHT/2, Stance::Idle, 0, FarmerIdle, FarmerIdleMask};
+uint8_t getImageHeight(const uint8_t *image);
+uint8_t getImageWidth(const uint8_t *image);
+bool drawObject = true;
+
+Farmer farmer = {WIDTH/2 - getImageWidth(FarmerIdle)/2, HEIGHT/2 + getImageHeight(FarmerIdle)/2, Stance::Idle, Direction::South, 0, FarmerIdle, FarmerIdleMask};
+Selector selector = {farmer.x + (getImageWidth(FarmerIdle) - getImageWidth(SelectorImage))/2, farmer.y + SELOFFSET, SelectorImage, SelectorImageMask};
 
 void setup() {
   arduboy.begin();
@@ -49,6 +67,7 @@ void loop() {
 
   drawBackground();
   drawFarmer();
+  drawSelector();
 
   arduboy.display();
 }
@@ -151,15 +170,37 @@ void updateFarmer() {
   }
 }
 
+void updateSelector() {
+  // We need to bound the selector to an 8x8 grid
+  uint8_t gridX = WIDTH / 8;
+  uint8_t gridY = HEIGHT / 8;
+}
+
 void drawFarmer() {
   uint8_t imageIndex = static_cast<uint8_t>(farmer.stance);
   uint8_t maskFrame = 0;
   if(farmer.stance == Stance::Idle) farmer.frame = 0;
-  if(farmer.stance == Stance::Walk) {
-    maskFrame = farmer.frame % 2;
-  }
+  if(farmer.stance == Stance::Walk) maskFrame = farmer.frame;
 
   farmer.image = farmerImages[imageIndex];
   farmer.mask = farmerMasks[imageIndex];
-  Sprites::drawExternalMask(farmer.x, farmer.y, farmer.image, farmer.mask, farmer.frame, maskFrame);
+  Sprites::drawExternalMask(farmer.x, farmer.y - getImageHeight(farmer.image), farmer.image, farmer.mask, farmer.frame, maskFrame);
+}
+
+void drawSelector() {
+  uint8_t flashDelay = 15;
+  if(arduboy.everyXFrames(flashDelay)){
+    drawObject = !drawObject;
+  }
+  if(drawObject) {
+    Sprites::drawExternalMask(selector.x, selector.y - getImageHeight(selector.image), selector.image, selector.mask, 0, 0);
+  }
+}
+
+uint8_t getImageHeight(const uint8_t *image) {
+  return pgm_read_byte_near(image + 1);
+}
+
+uint8_t getImageWidth(const uint8_t *image) {
+  return pgm_read_byte_near(image);
 }
