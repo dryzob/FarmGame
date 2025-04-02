@@ -5,18 +5,24 @@ Arduboy2 arduboy;
 #define GAMEFPS 30
 #define SELOFFSET 10
 
-enum class Stance {
+enum class Stance : uint8_t {
   Idle,
   Walk,
   Plant,
   Water
 };
 
-enum class Direction {
+enum class Direction : uint8_t {
   South, West, North, East
 };
 
-enum WalkFrame {
+enum class BGObject : uint8_t {
+  ground1,
+  ground2,
+  carrot
+};
+
+enum WalkFrame : uint8_t {
   South1, South2,
   West1, West2,
   North1, North2,
@@ -51,10 +57,15 @@ bool drawObject = true;
 Farmer farmer = {WIDTH/2 - getImageWidth(FarmerIdle)/2, HEIGHT/2 + getImageHeight(FarmerIdle)/2, Stance::Idle, Direction::South, 0, FarmerIdle, FarmerIdleMask};
 Selector selector = {farmer.x + (getImageWidth(FarmerIdle) - getImageWidth(SelectorImage))/2, farmer.y + SELOFFSET, SelectorImage, SelectorImageMask};
 
+const uint8_t gridMaxX = WIDTH / 8;
+const uint8_t gridMaxY = HEIGHT / 8;
+uint16_t grid[gridMaxX * gridMaxY];
+
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(GAMEFPS);
   arduboy.initRandomSeed();
+  buildInitialGrid();
 }
 
 void loop() {
@@ -75,15 +86,26 @@ void loop() {
 void drawBackground() {
   // Gonna use a 8x8 tile set for the background
   uint8_t tileSize = 8;
-  uint8_t currFrame = 0;
   for(uint8_t backY = 0; backY <= HEIGHT; backY += tileSize) {
     for(uint8_t backX = 0; backX <= WIDTH; backX += tileSize) {
-      Sprites::drawOverwrite(backX, backY, BG, currFrame);
-      if(currFrame == 0) {
-        currFrame = 1;
-      } else {
-        currFrame = 0;
+      switch(grid[backX]) { //                          <-------- THIS DOES NOT WORK
+        case static_cast<uint8_t>(BGObject::ground1):
+          Sprites::drawOverwrite(backX, backY, BG, 0);
+          break;
+        case static_cast<uint8_t>(BGObject::ground2):
+          Sprites::drawOverwrite(backX, backY, BG, 1);
+          break;
       }
+    }
+  }
+}
+
+void buildInitialGrid() {
+  for(uint8_t i = 0; i < (gridMaxX * gridMaxY); i++) {
+    if(i%2 == 0) {
+      grid[i] = static_cast<uint8_t>(BGObject::ground1);
+    } else {
+      grid[i] = static_cast<uint8_t>(BGObject::ground2);
     }
   }
 }
@@ -93,6 +115,7 @@ void controlFarmer() {
   if(arduboy.pressed(UP_BUTTON)) {
     farmer.y -= 1;
     farmer.stance = Stance::Walk;
+    farmer.direction = Direction::North;
     if(farmer.frame != WalkFrame::North1 && farmer.frame != WalkFrame::North2) {
       farmer.frame = WalkFrame::North1;
     }
@@ -101,6 +124,7 @@ void controlFarmer() {
   if(arduboy.pressed(DOWN_BUTTON)) {
     farmer.y += 1;
     farmer.stance = Stance::Walk;
+    farmer.direction = Direction::South;
     if(farmer.frame != WalkFrame::South1 && farmer.frame != WalkFrame::South2) {
       farmer.frame = WalkFrame::South1;
     }
@@ -109,6 +133,7 @@ void controlFarmer() {
   if(arduboy.pressed(LEFT_BUTTON)) {
     farmer.x -= 1;
     farmer.stance = Stance::Walk;
+    farmer.direction = Direction::West;
     if(farmer.frame != WalkFrame::West1 && farmer.frame != WalkFrame::West2) {
       farmer.frame = WalkFrame::West1;
     }
@@ -117,6 +142,7 @@ void controlFarmer() {
   if(arduboy.pressed(RIGHT_BUTTON)) {
     farmer.x += 1;
     farmer.stance = Stance::Walk;
+    farmer.direction = Direction::East;
     if(farmer.frame != WalkFrame::East1 && farmer.frame != WalkFrame::East2) {
       farmer.frame = WalkFrame::East1;
     }
@@ -171,9 +197,8 @@ void updateFarmer() {
 }
 
 void updateSelector() {
-  // We need to bound the selector to an 8x8 grid
-  uint8_t gridX = WIDTH / 8;
-  uint8_t gridY = HEIGHT / 8;
+  // Possibly round to the nearest block?
+
 }
 
 void drawFarmer() {
