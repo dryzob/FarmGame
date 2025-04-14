@@ -3,7 +3,8 @@
 Arduboy2 arduboy;
 
 #define GAMEFPS 30
-#define SELOFFSET 10
+#define SELOFFSET 8
+#define TILESIZE 8
 
 enum class Stance : uint8_t {
   Idle,
@@ -35,35 +36,64 @@ struct Farmer {
   uint16_t y;
   Stance stance;
   Direction direction;
+  bool canMove;
   uint8_t frame;
   const uint8_t *image;
   const uint8_t *mask;
+  Farmer(uint16_t initX, uint16_t initY) {
+    x = initX;
+    y = initY;
+    stance = Stance::Idle;
+    direction = Direction::South;
+    canMove = true;
+    frame = 0;
+    image = FarmerIdle;
+    mask = FarmerIdleMask;
+  }
 };
 
 struct Selector {
-  uint16_t x;
-  uint16_t y;
+  uint16_t trueX;
+  uint16_t trueY;
+  uint16_t roundX;
+  uint16_t roundY;
   const uint8_t *image;
   const uint8_t *mask;
+  Selector(uint16_t initX, uint16_t initY) {
+    trueX = initX;
+    trueY = initY;
+    roundX = 0;
+    roundY = 0;
+    image = SelectorImage;
+    mask = SelectorImageMask;
+  }
 };
 
 const uint8_t *farmerImages[] = {FarmerIdle, FarmerWalk};
 const uint8_t *farmerMasks[] = {FarmerIdleMask, FarmerWalkMask};
 
+// Function names
 uint8_t getImageHeight(const uint8_t *image);
 uint8_t getImageWidth(const uint8_t *image);
-bool drawObject = true;
 
-Farmer farmer = {WIDTH/2 - getImageWidth(FarmerIdle)/2, HEIGHT/2 + getImageHeight(FarmerIdle)/2, Stance::Idle, Direction::South, 0, FarmerIdle, FarmerIdleMask};
-Selector selector = {farmer.x + (getImageWidth(FarmerIdle) - getImageWidth(SelectorImage))/2, farmer.y + SELOFFSET, SelectorImage, SelectorImageMask};
+// Globals variables
+bool drawObject = true;
+bool menuOpen = false;
+
+Farmer farmer(WIDTH/2, HEIGHT/2);
+
+Selector selector(farmer.x + (getImageWidth(FarmerIdle) - getImageWidth(SelectorImage))/2, farmer.y + SELOFFSET);
 
 const uint8_t gridMaxX = WIDTH / 8;
 const uint8_t gridMaxY = HEIGHT / 8;
-uint16_t grid[gridMaxX * gridMaxY];
+const uint8_t gridSize = gridMaxX * gridMaxY;
+uint16_t grid[gridSize];
+
 
 void setup() {
   arduboy.begin();
   arduboy.setFrameRate(GAMEFPS);
+  // Serial.begin(9600);
   arduboy.initRandomSeed();
   buildInitialGrid();
 }
@@ -75,20 +105,30 @@ void loop() {
   
   controlFarmer();
   updateFarmer();
+  updateSelector();
+  if(arduboy.pressed(A_BUTTON)) {
+    menuOpen = true;
+  } else {
+    menuOpen = false;
+  }
 
   drawBackground();
   drawFarmer();
   drawSelector();
+  drawMenu();
+
+  // arduboy.fillRect(farmer.x-1, farmer.y, 3, 3); // Debug hitbox type thing
 
   arduboy.display();
 }
 
 void drawBackground() {
   // Gonna use a 8x8 tile set for the background
-  uint8_t tileSize = 8;
+  uint8_t tileSize = TILESIZE;
+  uint8_t index = 0;
   for(uint8_t backY = 0; backY <= HEIGHT; backY += tileSize) {
     for(uint8_t backX = 0; backX <= WIDTH; backX += tileSize) {
-      switch(grid[backX]) { //                          <-------- THIS DOES NOT WORK
+      switch(grid[index]) { 
         case static_cast<uint8_t>(BGObject::ground1):
           Sprites::drawOverwrite(backX, backY, BG, 0);
           break;
@@ -96,12 +136,16 @@ void drawBackground() {
           Sprites::drawOverwrite(backX, backY, BG, 1);
           break;
       }
+      index++;
+      if(index > (gridSize-1)) {
+        index = 0;
+      }
     }
   }
 }
 
 void buildInitialGrid() {
-  for(uint8_t i = 0; i < (gridMaxX * gridMaxY); i++) {
+  for(uint8_t i = 0; i < (gridSize); i++) {
     if(i%2 == 0) {
       grid[i] = static_cast<uint8_t>(BGObject::ground1);
     } else {
@@ -112,44 +156,50 @@ void buildInitialGrid() {
 
 void controlFarmer() {
   // This will be where all the controls will be set
-  if(arduboy.pressed(UP_BUTTON)) {
-    farmer.y -= 1;
-    farmer.stance = Stance::Walk;
-    farmer.direction = Direction::North;
-    if(farmer.frame != WalkFrame::North1 && farmer.frame != WalkFrame::North2) {
-      farmer.frame = WalkFrame::North1;
+  if(farmer.canMove) {
+    if(arduboy.pressed(UP_BUTTON)) {
+      farmer.y -= 1;
+      farmer.stance = Stance::Walk;
+      farmer.direction = Direction::North;
+      if(farmer.frame != WalkFrame::North1 && farmer.frame != WalkFrame::North2) {
+        farmer.frame = WalkFrame::North1;
+      }
+      
     }
-    
-  }
-  if(arduboy.pressed(DOWN_BUTTON)) {
-    farmer.y += 1;
-    farmer.stance = Stance::Walk;
-    farmer.direction = Direction::South;
-    if(farmer.frame != WalkFrame::South1 && farmer.frame != WalkFrame::South2) {
-      farmer.frame = WalkFrame::South1;
+    if(arduboy.pressed(DOWN_BUTTON)) {
+      farmer.y += 1;
+      farmer.stance = Stance::Walk;
+      farmer.direction = Direction::South;
+      if(farmer.frame != WalkFrame::South1 && farmer.frame != WalkFrame::South2) {
+        farmer.frame = WalkFrame::South1;
+      }
+      
     }
-    
-  }
-  if(arduboy.pressed(LEFT_BUTTON)) {
-    farmer.x -= 1;
-    farmer.stance = Stance::Walk;
-    farmer.direction = Direction::West;
-    if(farmer.frame != WalkFrame::West1 && farmer.frame != WalkFrame::West2) {
-      farmer.frame = WalkFrame::West1;
+    if(arduboy.pressed(LEFT_BUTTON)) {
+      farmer.x -= 1;
+      farmer.stance = Stance::Walk;
+      farmer.direction = Direction::West;
+      if(farmer.frame != WalkFrame::West1 && farmer.frame != WalkFrame::West2) {
+        farmer.frame = WalkFrame::West1;
+      }
+      
     }
-    
-  }
-  if(arduboy.pressed(RIGHT_BUTTON)) {
-    farmer.x += 1;
-    farmer.stance = Stance::Walk;
-    farmer.direction = Direction::East;
-    if(farmer.frame != WalkFrame::East1 && farmer.frame != WalkFrame::East2) {
-      farmer.frame = WalkFrame::East1;
+    if(arduboy.pressed(RIGHT_BUTTON)) {
+      farmer.x += 1;
+      farmer.stance = Stance::Walk;
+      farmer.direction = Direction::East;
+      if(farmer.frame != WalkFrame::East1 && farmer.frame != WalkFrame::East2) {
+        farmer.frame = WalkFrame::East1;
+      }
+    }
+    if(arduboy.notPressed(UP_BUTTON | DOWN_BUTTON | LEFT_BUTTON | RIGHT_BUTTON)) {
+      farmer.stance = Stance::Idle;
     }
   }
-  if(arduboy.notPressed(UP_BUTTON | DOWN_BUTTON | LEFT_BUTTON | RIGHT_BUTTON)) {
-    farmer.stance = Stance::Idle;
-  }
+  if(farmer.x > WIDTH) farmer.x = WIDTH;
+  if(farmer.x < 1) farmer.x = 1;
+  if(farmer.y > HEIGHT) farmer.y = HEIGHT;
+  if(farmer.y < 1) farmer.y = 1;
 }
 
 void updateFarmer() {
@@ -198,7 +248,34 @@ void updateFarmer() {
 
 void updateSelector() {
   // Possibly round to the nearest block?
-
+  switch(farmer.direction) {
+    case Direction::South:
+      selector.trueX = farmer.x;
+      selector.trueY = farmer.y + SELOFFSET;
+      break;
+    case Direction::West:
+      selector.trueX = farmer.x - (SELOFFSET*2);
+      selector.trueY = farmer.y;
+      break;
+    case Direction::North:
+      selector.trueX = farmer.x;
+      selector.trueY = farmer.y - SELOFFSET;
+      break;
+    case Direction::East:
+      selector.trueX = farmer.x + SELOFFSET;
+      selector.trueY = farmer.y;
+      break;
+    default:
+      break;
+  }
+  // [[BUG]] Will still cause a wrap due to SELOFFSET
+  if(selector.trueX > WIDTH) selector.trueX = WIDTH;
+  if(selector.trueX < 1) selector.trueX = 1;
+  if(selector.trueY > HEIGHT) selector.trueY = HEIGHT;
+  if(selector.trueX < 1) selector.trueY = 1; 
+  // Now to round these true values to the grid
+  selector.roundX = ((selector.trueX + TILESIZE/2) / TILESIZE) * TILESIZE;
+  selector.roundY = ((selector.trueY + TILESIZE/2) / TILESIZE) * TILESIZE;
 }
 
 void drawFarmer() {
@@ -209,17 +286,26 @@ void drawFarmer() {
 
   farmer.image = farmerImages[imageIndex];
   farmer.mask = farmerMasks[imageIndex];
-  Sprites::drawExternalMask(farmer.x, farmer.y - getImageHeight(farmer.image), farmer.image, farmer.mask, farmer.frame, maskFrame);
+  Sprites::drawExternalMask(farmer.x - getImageWidth(farmer.image)/2, farmer.y - getImageHeight(farmer.image),
+                            farmer.image, farmer.mask, farmer.frame, maskFrame);
 }
 
 void drawSelector() {
-  uint8_t flashDelay = 15;
+  uint8_t flashDelay = 10;
   if(arduboy.everyXFrames(flashDelay)){
     drawObject = !drawObject;
   }
   if(drawObject) {
-    Sprites::drawExternalMask(selector.x, selector.y - getImageHeight(selector.image), selector.image, selector.mask, 0, 0);
+    Sprites::drawExternalMask(selector.roundX, selector.roundY - getImageHeight(selector.image),
+                              selector.image, selector.mask, 0, 0);
   }
+}
+
+void drawMenu() {
+  if(!menuOpen) return; // menu is not open therefor, no draw
+
+  arduboy.fillRect(WIDTH/2, 0, WIDTH/2, HEIGHT, BLACK);
+  Sprites::drawExternalMask(WIDTH/2, 5, Menu, MenuMask, 0, 0);
 }
 
 uint8_t getImageHeight(const uint8_t *image) {
