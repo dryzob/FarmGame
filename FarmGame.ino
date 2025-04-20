@@ -303,9 +303,21 @@ void drawSelector() {
 
 void drawMenu() {
   if(!menuOpen) return; // menu is not open therefor, no draw
+  uint8_t menuBottom = HEIGHT - 4;
+  uint8_t menuLeft = WIDTH/2;
+  uint8_t lineWidth = 52;
 
-  arduboy.fillRect(WIDTH/2, 0, WIDTH/2, HEIGHT, BLACK);
-  Sprites::drawExternalMask(WIDTH/2, 5, Menu, MenuMask, 0, 0);
+  // Box
+  arduboy.fillRect(menuLeft, 0, menuLeft, HEIGHT, BLACK);
+  arduboy.drawRect((menuLeft), 0, (menuLeft), HEIGHT);
+  arduboy.drawRect((menuLeft)+2, 2, (menuLeft)-4, HEIGHT-4);
+
+  // Internal lines
+  for(uint8_t menuHeight = getImageHeight(Menu) + 15; menuHeight < menuBottom; menuHeight += 10) {
+    arduboy.drawFastHLine(menuLeft + 5, menuHeight, lineWidth);
+  }
+
+  Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 0, 0);
 }
 
 uint8_t getImageHeight(const uint8_t *image) {
