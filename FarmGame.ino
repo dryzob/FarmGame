@@ -10,12 +10,28 @@ enum class Stance : uint8_t {
   Idle,
   Walk,
   Plant,
-  Water
+  Water,
+  Hoe
 };
 
 enum class Direction : uint8_t {
   South, West, North, East
 };
+
+enum class Menus : uint8_t {
+  Tools,
+  Seeds,
+  Menu
+};
+// This is probably not smart to do but it works
+Menus& operator++(Menus &m) {
+  m = static_cast<Menus>(static_cast<uint8_t>(m) + 1);
+  return m;
+}
+Menus& operator--(Menus &m) {
+  m = static_cast<Menus>(static_cast<uint8_t>(m) - 1);
+  return m;
+}
 
 enum class BGObject : uint8_t {
   ground1,
@@ -79,6 +95,7 @@ uint8_t getImageWidth(const uint8_t *image);
 // Globals variables
 bool drawObject = true;
 bool menuOpen = false;
+Menus currMenu = Menus::Tools;
 
 Farmer farmer(WIDTH/2, HEIGHT/2);
 
@@ -103,14 +120,18 @@ void loop() {
   arduboy.clear();
   arduboy.pollButtons();
   
-  controlFarmer();
-  updateFarmer();
-  updateSelector();
   if(arduboy.pressed(A_BUTTON)) {
     menuOpen = true;
+    farmer.canMove = false;
   } else {
     menuOpen = false;
+    farmer.canMove = true;
   }
+
+  controlFarmer();
+  controlMenu();
+  updateFarmer();
+  updateSelector();
 
   drawBackground();
   drawFarmer();
@@ -151,6 +172,24 @@ void buildInitialGrid() {
     } else {
       grid[i] = static_cast<uint8_t>(BGObject::ground2);
     }
+  }
+}
+
+void controlMenu() {
+  if(menuOpen) {
+    // This will set up much the cursor jumps
+    switch(currMenu) {
+      case Menus::Tools:
+        break;
+      case Menus::Seeds:
+        break;
+      case Menus::Menu:
+        break;
+    }
+
+    // Actual inputs
+    if(arduboy.justPressed(LEFT_BUTTON) && currMenu > Menus::Tools) currMenu--;
+    if(arduboy.justPressed(RIGHT_BUTTON) && currMenu < Menus::Menu) currMenu++;
   }
 }
 
@@ -306,18 +345,49 @@ void drawMenu() {
   uint8_t menuBottom = HEIGHT - 4;
   uint8_t menuLeft = WIDTH/2;
   uint8_t lineWidth = 52;
+  uint8_t itemNum = 1;
 
   // Box
   arduboy.fillRect(menuLeft, 0, menuLeft, HEIGHT, BLACK);
   arduboy.drawRect((menuLeft), 0, (menuLeft), HEIGHT);
   arduboy.drawRect((menuLeft)+2, 2, (menuLeft)-4, HEIGHT-4);
 
-  // Internal lines
-  for(uint8_t menuHeight = getImageHeight(Menu) + 15; menuHeight < menuBottom; menuHeight += 10) {
-    arduboy.drawFastHLine(menuLeft + 5, menuHeight, lineWidth);
-  }
+  // swtich statement for type of menu: tools/seeds/menu
+  switch(currMenu) {
+    case Menus::Tools:
+      // want 3 spaces for this section: water can, hoe, scythe 
+      for(uint8_t menuHeight = getImageHeight(Menu) + 15; menuHeight < menuBottom; menuHeight += 15) {
+        arduboy.setCursor(menuLeft + 5, menuHeight - 3);
+        arduboy.print(itemNum);
+        arduboy.print(".");
 
-  Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 0, 0);
+        // names
+
+        itemNum++;
+      }
+      // tools title
+      Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 0, 0);
+      break;
+    case Menus::Seeds:
+      // Currently thinkin 4 seeds for this one
+      for(uint8_t menuHeight = getImageHeight(Menu) + 15; menuHeight < menuBottom; menuHeight += 10) {
+        arduboy.setCursor(menuLeft + 5, menuHeight - 3);
+        arduboy.print(itemNum);
+        arduboy.print(".");
+
+        // names
+
+        itemNum++;
+      }
+      Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 1, 1);
+      break;
+    case Menus::Menu:
+      // General menu stuff, this will be fairly unique compared to the other menus
+
+      Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 2, 2);
+      break;
+  }
+  
 }
 
 uint8_t getImageHeight(const uint8_t *image) {
