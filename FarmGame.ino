@@ -75,6 +75,7 @@ struct Selector {
   uint16_t roundY;
   const uint8_t *image;
   const uint8_t *mask;
+  bool visable;
   Selector(uint16_t initX, uint16_t initY) {
     trueX = initX;
     trueY = initY;
@@ -82,6 +83,7 @@ struct Selector {
     roundY = 0;
     image = SelectorImage;
     mask = SelectorImageMask;
+    visable = true;
   }
 };
 
@@ -93,9 +95,10 @@ uint8_t getImageHeight(const uint8_t *image);
 uint8_t getImageWidth(const uint8_t *image);
 
 // Globals variables
-bool drawObject = true;
+bool drawHighlighter = true;
 bool menuOpen = false;
 Menus currMenu = Menus::Tools;
+uint8_t currSelection[] = {0, 0, 0};
 
 Farmer farmer(WIDTH/2, HEIGHT/2);
 
@@ -177,19 +180,31 @@ void buildInitialGrid() {
 
 void controlMenu() {
   if(menuOpen) {
-    // This will set up much the cursor jumps
-    switch(currMenu) {
-      case Menus::Tools:
-        break;
-      case Menus::Seeds:
-        break;
-      case Menus::Menu:
-        break;
-    }
-
-    // Actual inputs
+    // player inputs
+    if(arduboy.justPressed(UP_BUTTON)) currSelection[static_cast<uint8_t>(currMenu)]--;
+    if(arduboy.justPressed(DOWN_BUTTON)) currSelection[static_cast<uint8_t>(currMenu)]++;
     if(arduboy.justPressed(LEFT_BUTTON) && currMenu > Menus::Tools) currMenu--;
     if(arduboy.justPressed(RIGHT_BUTTON) && currMenu < Menus::Menu) currMenu++;
+
+    // boundary guarding
+    if(currSelection[static_cast<uint8_t>(currMenu)] < 0 || currSelection[static_cast<uint8_t>(currMenu)] > 200) {
+      currSelection[static_cast<uint8_t>(currMenu)] = 0;
+    }
+    switch(currMenu) {
+      case Menus::Tools:
+        if(currSelection[static_cast<uint8_t>(currMenu)] > 2) {
+          currSelection[static_cast<uint8_t>(currMenu)] = 2;
+        }
+        break;
+      case Menus::Seeds:
+        if(currSelection[static_cast<uint8_t>(currMenu)] > 3) {
+          currSelection[static_cast<uint8_t>(currMenu)] = 3;
+        }
+        break;
+      case Menus::Menu:
+        // TODO add actual menu here
+        break;
+    }
   }
 }
 
@@ -286,35 +301,36 @@ void updateFarmer() {
 }
 
 void updateSelector() {
-  // Possibly round to the nearest block?
-  switch(farmer.direction) {
-    case Direction::South:
-      selector.trueX = farmer.x;
-      selector.trueY = farmer.y + SELOFFSET;
-      break;
-    case Direction::West:
-      selector.trueX = farmer.x - (SELOFFSET*2);
-      selector.trueY = farmer.y;
-      break;
-    case Direction::North:
-      selector.trueX = farmer.x;
-      selector.trueY = farmer.y - SELOFFSET;
-      break;
-    case Direction::East:
-      selector.trueX = farmer.x + SELOFFSET;
-      selector.trueY = farmer.y;
-      break;
-    default:
-      break;
+  if(!menuOpen) {
+    switch(farmer.direction) {
+      case Direction::South:
+        selector.trueX = farmer.x;
+        selector.trueY = farmer.y + SELOFFSET;
+        break;
+      case Direction::West:
+        selector.trueX = farmer.x - (SELOFFSET*2);
+        selector.trueY = farmer.y;
+        break;
+      case Direction::North:
+        selector.trueX = farmer.x;
+        selector.trueY = farmer.y - SELOFFSET;
+        break;
+      case Direction::East:
+        selector.trueX = farmer.x + SELOFFSET;
+        selector.trueY = farmer.y;
+        break;
+      default:
+        break;
+    }
+    // [[BUG]] Will still cause a wrap due to SELOFFSET
+    if(selector.trueX > WIDTH) selector.trueX = WIDTH;
+    if(selector.trueX < 1) selector.trueX = 1;
+    if(selector.trueY > HEIGHT) selector.trueY = HEIGHT;
+    if(selector.trueX < 1) selector.trueY = 1; 
+    // Now to round these true values to the grid
+    selector.roundX = ((selector.trueX + TILESIZE/2) / TILESIZE) * TILESIZE;
+    selector.roundY = ((selector.trueY + TILESIZE/2) / TILESIZE) * TILESIZE;
   }
-  // [[BUG]] Will still cause a wrap due to SELOFFSET
-  if(selector.trueX > WIDTH) selector.trueX = WIDTH;
-  if(selector.trueX < 1) selector.trueX = 1;
-  if(selector.trueY > HEIGHT) selector.trueY = HEIGHT;
-  if(selector.trueX < 1) selector.trueY = 1; 
-  // Now to round these true values to the grid
-  selector.roundX = ((selector.trueX + TILESIZE/2) / TILESIZE) * TILESIZE;
-  selector.roundY = ((selector.trueY + TILESIZE/2) / TILESIZE) * TILESIZE;
 }
 
 void drawFarmer() {
@@ -332,20 +348,24 @@ void drawFarmer() {
 void drawSelector() {
   uint8_t flashDelay = 10;
   if(arduboy.everyXFrames(flashDelay)){
-    drawObject = !drawObject;
+    selector.visable = !selector.visable;
   }
-  if(drawObject) {
+  if(selector.visable) {
     Sprites::drawExternalMask(selector.roundX, selector.roundY - getImageHeight(selector.image),
                               selector.image, selector.mask, 0, 0);
   }
 }
 
 void drawMenu() {
-  if(!menuOpen) return; // menu is not open therefor, no draw
+  if(!menuOpen) return; // menu is not open therefor no draw
   uint8_t menuBottom = HEIGHT - 4;
   uint8_t menuLeft = WIDTH/2;
   uint8_t lineWidth = 52;
   uint8_t itemNum = 1;
+  uint8_t delay = 15;
+
+  // Highlight toggle
+  if(arduboy.everyXFrames(delay)) drawHighlighter = !drawHighlighter;
 
   // Box
   arduboy.fillRect(menuLeft, 0, menuLeft, HEIGHT, BLACK);
@@ -367,6 +387,20 @@ void drawMenu() {
       }
       // tools title
       Sprites::drawExternalMask(WIDTH/2 + 3, 5, Menu, MenuMask, 0, 0);
+      // selection highlighter logic
+      if(drawHighlighter) {
+        switch(currSelection[static_cast<uint8_t>(currMenu)]) {
+          case 0:
+            arduboy.drawFastHLine(WIDTH/2 + 5, 28, 54);
+            break;
+          case 1:
+            arduboy.drawFastHLine(WIDTH/2 + 5, 43, 54);
+            break;
+          case 2:
+            arduboy.drawFastHLine(WIDTH/2 + 5, 58, 54);
+            break;
+        }
+      }
       break;
     case Menus::Seeds:
       // Currently thinkin 4 seeds for this one
