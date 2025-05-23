@@ -38,7 +38,6 @@ void loop() {
   drawMenu();
 
   // arduboy.fillRect(farmer.x-1, farmer.y, 3, 3); // Debug hitbox type thing
-  // arduboy.print(toolNames[0]);
 
   arduboy.display();
 }

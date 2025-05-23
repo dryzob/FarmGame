@@ -12,7 +12,6 @@ enum class Menus : uint8_t {
 };
 
 String toolNames[] = {String("Hoe"), String("W. Can"), String("Scythe")};
-uint8_t currSelection[] = {0, 0, 0};
 Menus currMenu = Menus::Tools;
 bool drawHighlighter = true;
 bool menuOpen = false;
@@ -108,15 +107,15 @@ void drawMenu() {
         switch(currSelection[static_cast<uint8_t>(currMenu)]) {
           case 0:
             arduboy.drawFastHLine(WIDTH/2 + 5, 28, 54);
-            setRGB('g');
+            // setRGB('g');
             break;
           case 1:
             arduboy.drawFastHLine(WIDTH/2 + 5, 43, 54);
-            setRGB('b');
+            // setRGB('b');
             break;
           case 2:
             arduboy.drawFastHLine(WIDTH/2 + 5, 58, 54);
-            setRGB('r');
+            // setRGB('r');
             break;
         }
       }

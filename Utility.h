@@ -6,6 +6,8 @@
 // VARIABLES
 const uint8_t tileSize = 8;
 const uint8_t gameFPS = 30;
+uint8_t currSelection[] = {0, 0, 0};
+uint8_t waitCounter = 0;
 
 // FUNCTIONS
 uint8_t getImageHeight(const uint8_t *image) {
@@ -14,6 +16,16 @@ uint8_t getImageHeight(const uint8_t *image) {
 
 uint8_t getImageWidth(const uint8_t *image) {
   return pgm_read_byte_near(image);
+}
+
+bool waitXFrames(uint8_t frames) {
+  if(waitCounter >= frames) {
+    waitCounter = 0;
+    return true;
+  } else {
+    waitCounter += 1;
+    return false;
+  }
 }
 
 void setRGB(char color) {
